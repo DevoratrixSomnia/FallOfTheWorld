@@ -1,0 +1,41 @@
+name: Build VST3
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Linux needs system libraries for JUCE
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libx11-dev libxinerama-dev libxext-dev \
+            libxrandr-dev libxcursor-dev libfreetype6-dev libfontconfig1-dev libgl1-mesa-dev
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=out
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Collect VST3
+        shell: bash
+        run: |
+          mkdir -p dist
+          find build -type d -name "*.vst3" -prune -exec cp -R {} dist/ \;
+          ls dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FallOfTheWorld-VST3-${{ matrix.os }}
+          path: dist
